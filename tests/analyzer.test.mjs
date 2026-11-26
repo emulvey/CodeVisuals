@@ -65,12 +65,41 @@ test('generates valid self-contained browser HTML guide (including self-analysis
   assert.ok(!html.includes('__GLASSBOX_CSS__'));
   assert.ok(!html.includes('__GLASSBOX_JS__'));
 
-  // Self-hosting regression test: analyzing Glassbox's own src/ (which contains placeholder tokens & <script> strings)
+  // Self-hosting regression test: analyzing Glassbox's own src/
   const selfIr = analyzeCodebase(path.resolve(__dirname, '../src'), { name: 'Glassbox Self' });
   const selfHtml = buildStandaloneHtml(selfIr);
   const scripts = [...selfHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
   assert.equal(scripts.length, 2, 'Should have exactly 2 script blocks');
   assert.doesNotThrow(() => new Function(scripts[0]), 'Embedded GlassboxIR data script must be valid JS');
   assert.doesNotThrow(() => new Function(scripts[1]), 'Embedded app.js script must be valid JS');
-  assert.ok(scripts[1].includes('initHud'), 'Embedded app.js must contain full application code');
+  assert.ok(scripts[1].includes('renderFunctionExplain'), 'Embedded app.js must include explain UI');
+
+  // Regression checks for Bug Radar & overlay scrolling/expansion
+  assert.ok(selfHtml.includes('id="btn-expand-risk"'), 'Bug Radar dock must include expand toggle button');
+  assert.ok(selfHtml.includes('id="story-expand"'), 'System Story panel must include expand toggle button');
+  assert.ok(selfHtml.includes('id="insp-expand"'), 'Inspector drawer must include expand toggle button');
+  assert.ok(scripts[1].includes('OVERLAY_SELECTOR') && scripts[1].includes('.story-panel'), 'Stage wheel/pan handlers must exclude floating panels');
+  assert.ok(scripts[1].includes('mountSourceViewer'), 'Source X-Ray must support expanding truncated files');
+  assert.ok(scripts[1].includes('btn-toggle-steps'), 'Visual pipeline must support expanding >12 steps');
+});
+
+test('semantic explainer generates system story, module roles, narrated steps, and data journeys', () => {
+  const ir = analyzeCodebase(DEMO_DIR, { name: 'PulsePay AI Demo' });
+
+  assert.ok(ir.systemStory?.archetype, 'Should infer system archetype');
+  assert.ok(ir.systemStory.headline.includes('PulsePay AI Demo'), 'Headline should describe project');
+  assert.equal(ir.systemStory.sections.length, 4, 'System story should have 4 structured sections');
+
+  const pipelineMod = ir.modules.find((m) => m.name === 'checkoutPipeline.ts');
+  assert.ok(pipelineMod?.explanation?.shortIntent, 'Module should have short plain-English intent');
+  assert.ok(pipelineMod?.explanation?.summary.length > 20, 'Module should have readable summary');
+
+  const pipelineFn = ir.functions.find((f) => f.name === 'runCheckoutPipeline');
+  assert.ok(pipelineFn?.explanation?.plainEnglish.length > 20, 'Function should have plain-English summary');
+  assert.ok(pipelineFn.explanation.narratedSteps.length >= 5, 'Function should have narrated step storyboard');
+  assert.ok(pipelineFn.explanation.dataJourney.inputs.length >= 4, 'Data journey should explain each input parameter');
+  assert.ok(pipelineFn.explanation.narratedSteps.some((s) => s.targetFunctionId), 'Call steps should link to target chips');
+
+  assert.ok(ir.flows[0].storySummary, 'Flows should have end-to-end story summary');
+  assert.ok(ir.flows[0].hops[0].narration, 'Each flow hop should include plain-English narration');
 });

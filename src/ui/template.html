@@ -47,6 +47,15 @@ __GLASSBOX_CSS__
 
       <!-- RIGHT CONTROLS -->
       <div class="hud-right">
+        <button id="btn-story" class="hud-btn hud-btn-explain" title="Open Plain-English System Story (Key: S)">
+          <span class="btn-dot explain-dot"></span>
+          <span>System Story</span>
+        </button>
+
+        <button id="btn-plain-mode" class="hud-btn active-explain" title="Toggle Plain-English Labels on Canvas Chips (Key: E)">
+          <span>Plain English</span>
+        </button>
+
         <div class="flow-menu-wrap">
           <button id="btn-flows" class="hud-btn hud-btn-signal" title="Follow an End-to-End Execution Signal">
             <span class="btn-dot signal-dot"></span>
@@ -154,15 +163,37 @@ __GLASSBOX_CSS__
         <!-- FLOATING BUG RADAR DOCK -->
         <div id="risk-dock" class="risk-dock hidden">
           <div class="risk-dock-header">
-            <div class="risk-dock-title">
-              <span class="risk-dot-lg"></span>
-              <strong>Bug Radar &amp; AI-Code Audit</strong>
-              <span id="risk-dock-summary" class="muted"></span>
+            <div class="risk-dock-top-row">
+              <div class="risk-dock-title">
+                <span class="risk-dot-lg"></span>
+                <strong>Bug Radar &amp; AI-Code Audit</strong>
+                <span id="risk-dock-summary" class="muted"></span>
+              </div>
+              <div class="panel-header-actions">
+                <button id="btn-expand-risk" class="panel-action-btn" title="Expand or compact Bug Radar panel" aria-expanded="false">⤢ Expand</button>
+                <button id="btn-close-risk" class="icon-close" title="Exit Risk Lens">✕</button>
+              </div>
             </div>
             <div id="risk-filters" class="risk-filters"></div>
-            <button id="btn-close-risk" class="icon-close" title="Exit Risk Lens">✕</button>
           </div>
           <div id="risk-list" class="risk-list"></div>
+          <div id="risk-dock-footer" class="risk-dock-footer hidden"></div>
+        </div>
+
+        <!-- FLOATING SYSTEM STORY BRIEF PANEL -->
+        <div id="story-panel" class="story-panel hidden">
+          <div class="story-header">
+            <div>
+              <span id="story-archetype" class="story-archetype">SYSTEM BRIEF</span>
+              <h3 id="story-headline" class="story-headline"></h3>
+            </div>
+            <div class="panel-header-actions">
+              <button id="story-expand" class="panel-action-btn" title="Expand or compact System Story" aria-expanded="false">⤢ Expand</button>
+              <button id="story-close" class="icon-close" title="Close System Story (Esc)">✕</button>
+            </div>
+          </div>
+          <div id="story-concepts" class="story-concepts"></div>
+          <div id="story-sections" class="story-sections"></div>
         </div>
 
         <!-- FLOATING SIGNAL TRACER STEPPER DOCK -->
@@ -182,6 +213,7 @@ __GLASSBOX_CSS__
           </div>
           <div id="trace-beads" class="trace-beads"></div>
           <div id="trace-packet" class="trace-packet"></div>
+          <div id="trace-narration" class="trace-narration"></div>
         </div>
 
         <!-- FLOATING GUIDED TOUR CARD -->
@@ -223,17 +255,22 @@ __GLASSBOX_CSS__
             <h2 id="insp-title" class="insp-title">Select any chip or wire</h2>
             <div id="insp-subtitle" class="insp-subtitle"></div>
           </div>
-          <button id="insp-close" class="icon-close" title="Close Inspector (Esc)">✕</button>
+          <div class="panel-header-actions">
+            <button id="insp-expand" class="icon-close" title="Expand / Narrow Inspector" aria-expanded="false">⤢</button>
+            <button id="insp-close" class="icon-close" title="Close Inspector (Esc)">✕</button>
+          </div>
         </div>
 
         <div id="insp-actions" class="insp-actions"></div>
 
         <div class="insp-tabs">
-          <button class="insp-tab active" data-tab="visual">Visual Flow</button>
+          <button class="insp-tab active" data-tab="explain">Explain</button>
+          <button class="insp-tab" data-tab="visual">Visual Flow</button>
           <button class="insp-tab" data-tab="source">Source X-Ray</button>
         </div>
 
-        <div id="insp-body-visual" class="insp-body"></div>
+        <div id="insp-body-explain" class="insp-body"></div>
+        <div id="insp-body-visual" class="insp-body hidden"></div>
         <div id="insp-body-source" class="insp-body hidden"></div>
       </aside>
     </main>

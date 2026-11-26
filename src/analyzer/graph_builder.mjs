@@ -227,6 +227,7 @@ function indexModulesAndFunctions(rawFiles, moduleIdSet) {
       libraries: [...libsUsed],
       functionIds: modFns.map((f) => f.id),
       source: rf.source,
+      docComment: rf.parsed.docComment || null,
       summary: '',
       metrics: { complexity: modFns.reduce((s, f) => s + f.complexity, 0), fanIn: 0, fanOut: 0, diagnosticCount: 0, maxSeverity: null }
     });

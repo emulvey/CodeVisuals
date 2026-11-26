@@ -55,11 +55,18 @@
     hover: null,
     riskLens: false,
     riskFilter: 'all',
+    riskExpanded: false,
     activeTrace: null, // flow object
     traceHop: 0,
     traceTimer: null,
     tourIndex: -1,
-    activeTab: 'visual',
+    activeTab: 'explain',
+    plainEnglishMode: true,
+    storyOpen: false,
+    storyExpanded: false,
+    inspectorExpanded: false,
+    searchShowAll: false,
+    searchSelectedIndex: 0,
     theme: 'dark',
     layout: null,
     animFrame: null
@@ -84,6 +91,14 @@
     healthScoreVal: document.getElementById('health-score-val'),
     healthRingFg: document.getElementById('health-ring-fg'),
     healthPill: document.getElementById('health-pill'),
+    btnStory: document.getElementById('btn-story'),
+    btnPlainMode: document.getElementById('btn-plain-mode'),
+    storyPanel: document.getElementById('story-panel'),
+    btnExpandStory: document.getElementById('story-expand'),
+    storyArchetype: document.getElementById('story-archetype'),
+    storyHeadline: document.getElementById('story-headline'),
+    storyConcepts: document.getElementById('story-concepts'),
+    storySections: document.getElementById('story-sections'),
     btnFlows: document.getElementById('btn-flows'),
     flowPopover: document.getElementById('flow-popover'),
     btnRisk: document.getElementById('btn-risk'),
@@ -93,10 +108,12 @@
     themeGlyph: document.getElementById('theme-glyph'),
     zoomPct: document.getElementById('zoom-pct'),
     inspector: document.getElementById('inspector'),
+    btnExpandInspector: document.getElementById('insp-expand'),
     inspBadges: document.getElementById('insp-badges'),
     inspTitle: document.getElementById('insp-title'),
     inspSubtitle: document.getElementById('insp-subtitle'),
     inspActions: document.getElementById('insp-actions'),
+    inspExplain: document.getElementById('insp-body-explain'),
     inspVisual: document.getElementById('insp-body-visual'),
     inspSource: document.getElementById('insp-body-source'),
     traceDock: document.getElementById('trace-dock'),
@@ -104,11 +121,14 @@
     traceHopCounter: document.getElementById('trace-hop-counter'),
     traceBeads: document.getElementById('trace-beads'),
     tracePacket: document.getElementById('trace-packet'),
+    traceNarration: document.getElementById('trace-narration'),
     tracePlay: document.getElementById('trace-play'),
     riskDock: document.getElementById('risk-dock'),
+    btnExpandRisk: document.getElementById('btn-expand-risk'),
     riskDockSummary: document.getElementById('risk-dock-summary'),
     riskFilters: document.getElementById('risk-filters'),
     riskList: document.getElementById('risk-list'),
+    riskDockFooter: document.getElementById('risk-dock-footer'),
     tourCard: document.getElementById('tour-card'),
     tourTitle: document.getElementById('tour-title'),
     tourCaption: document.getElementById('tour-caption'),
@@ -690,8 +710,9 @@
       g.appendChild(svgEl('text', { x: tx + 35, y: ty + 39, 'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 8.5, 'letter-spacing': '0.06em' }, st.lbl));
     });
 
-    const preview = node.mods.slice(0, 3).map((m) => m.name).join(' · ');
-    g.appendChild(svgEl('text', { x: node.x + 18, y: node.y + 166, fill: 'var(--text-muted)', 'font-size': 11, 'font-family': 'var(--font-mono)' }, trunc(preview, 32)));
+    const extraMods = node.mods.length > 3 ? ` +${node.mods.length - 3} more` : '';
+    const preview = node.mods.slice(0, 3).map((m) => m.name).join(' · ') + extraMods;
+    g.appendChild(svgEl('text', { x: node.x + 18, y: node.y + 166, fill: 'var(--text-muted)', 'font-size': 11, 'font-family': 'var(--font-mono)' }, trunc(preview, 34)));
     g.appendChild(svgEl('text', { x: node.x + 18, y: node.y + 198, fill: color, 'font-size': 11, 'font-weight': 600 }, 'Click to inspect circuit →'));
 
     if (node.diagCount > 0) {
@@ -710,12 +731,24 @@
     g.appendChild(svgEl('rect', { x: node.x, y: node.y, width: node.w, height: node.h, rx: 14, fill: 'var(--surface-card)', stroke: '#c084fc', 'stroke-width': 1.2, 'stroke-dasharray': '5 4', 'stroke-opacity': 0.6 }));
     g.appendChild(svgEl('text', { x: node.x + 20, y: node.y + 28, fill: '#c084fc', 'font-size': 11.5, 'font-weight': 700, 'letter-spacing': '0.07em' }, `EXTERNAL LIBRARY BUS · ${DATA.libraries.length} PACKAGES`));
     let px = node.x + 20;
-    for (const lib of DATA.libraries.slice(0, 9)) {
+    let shown = 0;
+    const moreReserve = 86;
+    for (let i = 0; i < DATA.libraries.length; i++) {
+      const lib = DATA.libraries[i];
       const lw = Math.min(132, Math.max(74, lib.name.length * 7.8 + 26));
-      if (px + lw > node.x + node.w - 20) break;
+      const remainingAfter = DATA.libraries.length - (i + 1);
+      const limitX = node.x + node.w - 20 - (remainingAfter > 0 ? moreReserve : 0);
+      if (px + lw > limitX) break;
       g.appendChild(svgEl('rect', { x: px, y: node.y + 44, width: lw, height: 34, rx: 8, fill: 'var(--surface-elevated)', stroke: LIB_COLORS[lib.category] || '#c084fc', 'stroke-opacity': 0.55 }));
       g.appendChild(svgEl('text', { x: px + lw / 2, y: node.y + 65, 'text-anchor': 'middle', fill: 'var(--text-strong)', 'font-size': 11.5, 'font-family': 'var(--font-mono)', 'font-weight': 600 }, trunc(lib.name, 14)));
       px += lw + 10;
+      shown++;
+    }
+    if (shown < DATA.libraries.length) {
+      const rest = DATA.libraries.length - shown;
+      const mw = 74;
+      g.appendChild(svgEl('rect', { x: px, y: node.y + 44, width: mw, height: 34, rx: 8, fill: 'rgba(192, 132, 252, 0.14)', stroke: '#c084fc', 'stroke-dasharray': '3 2' }));
+      g.appendChild(svgEl('text', { x: px + mw / 2, y: node.y + 65, 'text-anchor': 'middle', fill: '#c084fc', 'font-size': 11, 'font-family': 'var(--font-mono)', 'font-weight': 700 }, `+${rest} more`));
     }
     g.addEventListener('click', (e) => { e.stopPropagation(); setSemanticZoom(2, true); });
     el.layerNodes.appendChild(g);
@@ -828,7 +861,10 @@
     }
 
     g.appendChild(svgEl('text', { x: node.x + 14, y: node.y + 47, fill: 'var(--text-strong)', 'font-size': 13.5, 'font-weight': 700, 'font-family': 'var(--font-mono)' }, trunc(mod.name, 25)));
-    g.appendChild(svgEl('text', { x: node.x + 14, y: node.y + 63, fill: 'var(--text-muted)', 'font-size': 10.5 }, trunc(mod.dir === '.' ? mod.summary : `${mod.dir} · ${mod.summary}`, 34)));
+    const modSub = state.plainEnglishMode && mod.explanation?.shortIntent
+      ? mod.explanation.shortIntent
+      : (mod.dir === '.' ? mod.summary : `${mod.dir} · ${mod.summary}`);
+    g.appendChild(svgEl('text', { x: node.x + 14, y: node.y + 63, fill: state.plainEnglishMode ? 'var(--accent-domain)' : 'var(--text-muted)', 'font-size': 10.5 }, trunc(modSub, 34)));
 
     const avgC = mod.metrics.complexity / Math.max(1, mod.functionIds.length);
     g.appendChild(svgEl('rect', { x: node.x + 14, y: node.y + 78, width: 86, height: 5, rx: 2.5, fill: 'rgba(148,163,184,0.16)' }));
@@ -844,7 +880,8 @@
     g.addEventListener('dblclick', (ev) => { ev.stopPropagation(); setSemanticZoom(3, false); focusNodeInView(mod.functionIds[0] || mod.id); });
     g.addEventListener('mouseenter', (ev) => {
       if (!state.selection && !state.activeTrace && !state.riskLens) { state.hover = { type: 'module', id: mod.id }; applyHoverSpotlight(); }
-      showTooltip(ev, mod.id, `${mod.lines} lines · ${mod.functionIds.length} functions · Click to inspect · Double-click for functions`);
+      const tt = mod.explanation?.summary || `${mod.lines} lines · ${mod.functionIds.length} functions`;
+      showTooltip(ev, mod.id, tt);
     });
     g.addEventListener('mouseleave', () => {
       hideTooltip();
@@ -964,8 +1001,12 @@
 
     const inLabel = fn.params.length ? fn.params.map((p) => p.name).join(', ') : '∅';
     const outLabel = fn.returnType || fn.returnExprs[0] || 'void';
-    g.appendChild(svgEl('text', { x: node.x + 11, y: node.y + 42, fill: 'var(--accent-entry)', 'font-size': 10, 'font-family': 'var(--font-mono)' }, `in: ${trunc(inLabel, 18)}`));
-    g.appendChild(svgEl('text', { x: node.x + node.w - 11, y: node.y + 42, 'text-anchor': 'end', fill: 'var(--accent-domain)', 'font-size': 10, 'font-family': 'var(--font-mono)' }, `→ ${trunc(outLabel, 16)}`));
+    if (state.plainEnglishMode && fn.explanation?.shortIntent) {
+      g.appendChild(svgEl('text', { x: node.x + 11, y: node.y + 42, fill: 'var(--accent-domain)', 'font-size': 10.4, 'font-weight': 550 }, trunc(fn.explanation.shortIntent, 38)));
+    } else {
+      g.appendChild(svgEl('text', { x: node.x + 11, y: node.y + 42, fill: 'var(--accent-entry)', 'font-size': 10, 'font-family': 'var(--font-mono)' }, `in: ${trunc(inLabel, 18)}`));
+      g.appendChild(svgEl('text', { x: node.x + node.w - 11, y: node.y + 42, 'text-anchor': 'end', fill: 'var(--accent-domain)', 'font-size': 10, 'font-family': 'var(--font-mono)' }, `→ ${trunc(outLabel, 16)}`));
+    }
 
     const bx = node.x + 11;
     const by = node.y + 57;
@@ -981,7 +1022,8 @@
 
     g.addEventListener('click', (ev) => { ev.stopPropagation(); selectEntity('function', fn.id); });
     g.addEventListener('mouseenter', (ev) => {
-      showTooltip(ev, `${fn.qualName}(${inLabel})`, `${fn.lines} lines · Complexity ${fn.complexity} · ${fn.metrics.fanIn} callers · ${fn.metrics.fanOut} calls`);
+      const tip = fn.explanation?.plainEnglish || `${fn.lines} lines · Complexity ${fn.complexity}`;
+      showTooltip(ev, `${fn.qualName}(${inLabel})`, tip);
     });
     g.addEventListener('mouseleave', hideTooltip);
     el.layerNodes.appendChild(g);
@@ -1137,19 +1179,296 @@
     renderCanvas();
   }
 
+  function setActiveInspectorTab(tabName) {
+    state.activeTab = tabName;
+    document.querySelectorAll('.insp-tab').forEach((t) => {
+      t.classList.toggle('active', t.getAttribute('data-tab') === tabName);
+    });
+    el.inspExplain.classList.toggle('hidden', tabName !== 'explain');
+    el.inspVisual.classList.toggle('hidden', tabName !== 'visual');
+    el.inspSource.classList.toggle('hidden', tabName !== 'source');
+  }
+
   function renderInspector() {
     if (!state.selection) return;
     const { type, id } = state.selection;
-    el.inspBadges.innerHTML = '';
-    el.inspActions.innerHTML = '';
-    el.inspVisual.innerHTML = '';
-    el.inspSource.innerHTML = '';
+    el.inspBadges.textContent = '';
+    el.inspActions.textContent = '';
+    el.inspExplain.textContent = '';
+    el.inspVisual.textContent = '';
+    el.inspSource.textContent = '';
+    el.inspExplain.scrollTop = 0;
+    el.inspVisual.scrollTop = 0;
+    el.inspSource.scrollTop = 0;
 
-    if (type === 'function') renderFunctionInspector(fnById.get(id));
-    else if (type === 'module') renderModuleInspector(modById.get(id));
-    else if (type === 'library') renderLibraryInspector(libById.get(id));
-    else if (type === 'callEdge') renderCallEdgeInspector(callEdgeById.get(id));
-    else if (type === 'modEdge') renderModEdgeInspector(modEdgeById.get(id));
+    if (type === 'function') {
+      const fn = fnById.get(id);
+      renderFunctionExplain(fn);
+      renderFunctionInspector(fn);
+    } else if (type === 'module') {
+      const mod = modById.get(id);
+      renderModuleExplain(mod);
+      renderModuleInspector(mod);
+    } else if (type === 'library') {
+      const lib = libById.get(id);
+      renderLibraryExplain(lib);
+      renderLibraryInspector(lib);
+    } else if (type === 'callEdge') {
+      const edge = callEdgeById.get(id);
+      renderEdgeExplain(edge, 'call');
+      renderCallEdgeInspector(edge);
+    } else if (type === 'modEdge') {
+      const edge = modEdgeById.get(id);
+      renderEdgeExplain(edge, 'module');
+      renderModEdgeInspector(edge);
+    }
+  }
+
+  function makeExplainHero(label, text, tags = []) {
+    const box = document.createElement('div');
+    box.className = 'explain-hero';
+    const lbl = document.createElement('div');
+    lbl.className = 'explain-hero-label';
+    lbl.textContent = label;
+    const p = document.createElement('div');
+    p.className = 'explain-hero-text';
+    p.textContent = text;
+    box.append(lbl, p);
+    if (tags.length) {
+      const row = document.createElement('div');
+      row.className = 'intent-tags';
+      for (const t of tags) {
+        const pill = document.createElement('span');
+        pill.className = 'intent-tag';
+        pill.textContent = t;
+        row.appendChild(pill);
+      }
+      box.appendChild(row);
+    }
+    return box;
+  }
+
+  function makeSection(title) {
+    const sec = document.createElement('div');
+    sec.className = 'insp-section';
+    const h = document.createElement('div');
+    h.className = 'insp-section-title';
+    h.textContent = title;
+    sec.appendChild(h);
+    return sec;
+  }
+
+  function renderFunctionExplain(fn) {
+    if (!fn) return;
+    const exp = fn.explanation;
+    if (!exp) return;
+
+    el.inspExplain.appendChild(makeExplainHero('In Plain English', exp.plainEnglish, exp.tags));
+
+    // Step-by-step interactive storyboard
+    const stepSec = makeSection(`How It Works (${exp.narratedSteps.length} steps)`);
+    const board = document.createElement('div');
+    board.className = 'storyboard';
+    const kindColors = { guard: '#fbbf24', branch: '#f59e0b', transform: '#818cf8', call: '#38bdf8', io: '#22d3ee', loop: '#a78bfa', error: '#fb7185', output: '#34d399' };
+
+    if (exp.narratedSteps.length) {
+      exp.narratedSteps.forEach((st, idx) => {
+        const card = document.createElement('div');
+        card.className = `story-step${st.targetFunctionId ? ' clickable' : ''}`;
+        card.style.borderLeftColor = kindColors[st.kind] || '#38bdf8';
+        const num = document.createElement('span');
+        num.className = 'step-num';
+        num.textContent = String(idx + 1);
+        const content = document.createElement('div');
+        content.className = 'step-content';
+        const cap = document.createElement('div');
+        cap.className = 'step-caption';
+        cap.textContent = st.caption;
+        const meta = document.createElement('div');
+        meta.className = 'step-meta';
+        meta.textContent = `${st.kind.toUpperCase()} · L${st.line}${st.targetFunctionId ? ' · Click to jump →' : ''}`;
+        content.append(cap, meta);
+        card.append(num, content);
+        if (st.targetFunctionId) {
+          card.addEventListener('click', () => {
+            if (state.zoomLevel !== 3) setSemanticZoom(3, false);
+            selectEntity('function', st.targetFunctionId);
+            focusNodeInView(st.targetFunctionId, 0.95);
+          });
+        }
+        board.appendChild(card);
+      });
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 'muted';
+      empty.textContent = 'Direct single-expression computation.';
+      board.appendChild(empty);
+    }
+    stepSec.appendChild(board);
+    el.inspExplain.appendChild(stepSec);
+
+    // Data Journey Ledger
+    const dj = exp.dataJourney;
+    if (dj) {
+      const ledgerSec = makeSection('Data Transformation & Assumptions');
+      const grid = document.createElement('div');
+      grid.className = 'ledger-grid';
+
+      if (dj.inputs.length) {
+        const inBox = document.createElement('div');
+        inBox.className = 'ledger-box';
+        for (const inp of dj.inputs) {
+          const row = document.createElement('div');
+          row.className = 'ledger-row';
+          const left = document.createElement('span');
+          left.className = 'ledger-var';
+          left.textContent = inp.name;
+          const right = document.createElement('span');
+          right.className = 'muted';
+          right.textContent = inp.role;
+          row.append(left, right);
+          inBox.appendChild(row);
+        }
+        grid.appendChild(inBox);
+      }
+
+      const summaryBox = document.createElement('div');
+      summaryBox.className = 'ledger-box';
+      const lines = [
+        ['OUTPUT', dj.outputs],
+        ['SIDE EFFECTS', dj.sideEffects.join('; ')],
+        ['EDGE CASES', dj.edgeCases.join(' · ')]
+      ];
+      for (const [k, v] of lines) {
+        const row = document.createElement('div');
+        row.className = 'ledger-row';
+        const lbl = document.createElement('span');
+        lbl.className = 'muted';
+        lbl.style.fontWeight = '700';
+        lbl.textContent = k;
+        const val = document.createElement('span');
+        val.style.textAlign = 'right';
+        val.textContent = v;
+        row.append(lbl, val);
+        summaryBox.appendChild(row);
+      }
+      grid.appendChild(summaryBox);
+      ledgerSec.appendChild(grid);
+      el.inspExplain.appendChild(ledgerSec);
+    }
+  }
+
+  function renderModuleExplain(mod) {
+    if (!mod || !mod.explanation) return;
+    el.inspExplain.appendChild(makeExplainHero('Module Role', mod.explanation.summary, mod.explanation.tags));
+
+    const fns = mod.functionIds.map((id) => fnById.get(id)).filter(Boolean);
+    const fnSec = makeSection(`What Each Function Does (${fns.length})`);
+    const list = document.createElement('div');
+    list.className = 'chip-list';
+    for (const f of fns) {
+      const btn = document.createElement('button');
+      btn.className = 'nav-chip';
+      const wrap = document.createElement('div');
+      const main = document.createElement('div');
+      main.className = 'nav-chip-main';
+      main.textContent = `${f.isAsync ? '⚡ ' : ''}${f.qualName}()`;
+      const sub = document.createElement('div');
+      sub.className = 'nav-chip-sub';
+      sub.textContent = f.explanation?.shortIntent || `L${f.startLine}`;
+      wrap.append(main, sub);
+      btn.appendChild(wrap);
+      btn.addEventListener('click', () => selectEntity('function', f.id));
+      list.appendChild(btn);
+    }
+    if (!fns.length) {
+      const m = document.createElement('div');
+      m.className = 'muted';
+      m.textContent = 'Top-level script or configuration module.';
+      list.appendChild(m);
+    }
+    fnSec.appendChild(list);
+    el.inspExplain.appendChild(fnSec);
+  }
+
+  function renderLibraryExplain(lib) {
+    if (!lib) return;
+    el.inspExplain.appendChild(makeExplainHero(
+      'External Dependency Role',
+      `"${lib.name}" is a ${lib.category} package wired into ${lib.moduleIds.length} module(s). Clicking any connected module reveals how data enters or leaves this boundary.`,
+      [lib.category]
+    ));
+  }
+
+  function renderEdgeExplain(edge, kind) {
+    if (!edge) return;
+    const text = kind === 'call'
+      ? (edge.explanation || 'Direct function invocation passing arguments across chips.')
+      : `"${modById.get(edge.from)?.name}" depends on "${modById.get(edge.to)?.name}" importing ${edge.symbols.join(', ') || 'module exports'}.`;
+    el.inspExplain.appendChild(makeExplainHero(kind === 'call' ? 'What Crosses This Wire' : 'Why These Modules Connect', text));
+  }
+
+  function renderSystemStory() {
+    const story = DATA.systemStory;
+    if (!story) return;
+    el.storyArchetype.textContent = story.archetype;
+    el.storyHeadline.textContent = story.headline;
+
+    el.storyConcepts.textContent = '';
+    for (const c of story.keyConcepts || []) {
+      const pill = document.createElement('span');
+      pill.className = 'concept-pill';
+      pill.textContent = c;
+      el.storyConcepts.appendChild(pill);
+    }
+
+    el.storySections.textContent = '';
+    for (const sec of story.sections || []) {
+      const card = document.createElement('div');
+      card.className = 'story-card';
+      const head = document.createElement('div');
+      head.className = 'story-card-head';
+      const ic = document.createElement('span');
+      ic.className = 'story-card-icon';
+      ic.style.background = `${sec.color}22`;
+      ic.style.color = sec.color;
+      ic.textContent = sec.icon;
+      const title = document.createElement('span');
+      title.textContent = sec.title;
+      head.append(ic, title);
+
+      const txt = document.createElement('div');
+      txt.className = 'story-card-text';
+      txt.textContent = sec.text;
+      card.append(head, txt);
+
+      if (sec.links?.length) {
+        const links = document.createElement('div');
+        links.className = 'story-links';
+        for (const lk of sec.links) {
+          const btn = document.createElement('button');
+          btn.className = 'story-link-btn';
+          btn.textContent = lk.label;
+          btn.addEventListener('click', () => {
+            toggleSystemStory(false);
+            const targetLevel = lk.type === 'function' ? 3 : 2;
+            if (state.zoomLevel !== targetLevel) setSemanticZoom(targetLevel, false);
+            selectEntity(lk.type, lk.id);
+            focusNodeInView(lk.id, 0.95);
+          });
+          links.appendChild(btn);
+        }
+        card.appendChild(links);
+      }
+      el.storySections.appendChild(card);
+    }
+  }
+
+  function toggleSystemStory(force) {
+    state.storyOpen = force !== undefined ? force : !state.storyOpen;
+    el.storyPanel.classList.toggle('hidden', !state.storyOpen);
+    el.btnStory.classList.toggle('active-explain', state.storyOpen);
+    if (state.storyOpen) renderSystemStory();
   }
 
   function renderFunctionInspector(fn) {
@@ -1175,15 +1494,16 @@
     document.getElementById('act-open-mod').onclick = () => selectEntity('module', fn.moduleId);
 
     // 1. Visual Internal Processing Schematic (SVG!)
-    const pipelineHtml = buildFunctionPipelineSvg(fn);
+    const pipelineHtml = buildFunctionPipelineSvg(fn, false);
     const callers = DATA.callEdges.filter((e) => e.to === fn.id);
     const callees = DATA.callEdges.filter((e) => e.from === fn.id);
     const diags = diagsByFn.get(fn.id) || [];
 
     el.inspVisual.innerHTML = `
       <div class="insp-section">
-        <div class="insp-section-title">Internal Data Processing Schematic</div>
-        <div class="pipeline-box">${pipelineHtml}</div>
+        <div class="insp-section-title">Internal Data Processing Schematic (${fn.steps.length} step${fn.steps.length === 1 ? '' : 's'})</div>
+        <div class="pipeline-box" id="fn-pipeline-box">${pipelineHtml}</div>
+        ${fn.steps.length > 12 ? `<button class="expand-more-btn" id="btn-toggle-steps" data-expanded="0">Show all ${fn.steps.length} steps (+${fn.steps.length - 12} more)</button>` : ''}
       </div>
 
       ${diags.length ? `
@@ -1191,13 +1511,13 @@
         <div class="insp-section-title">Bug Radar Findings (${diags.length})</div>
         <div class="chip-list">
           ${diags.map((d) => `
-            <div class="risk-card sev-${d.severity}" style="cursor:default">
-              <div>
+            <div class="risk-card sev-${d.severity}" data-jump-line="${d.line || fn.startLine}" title="Click to inspect line in Source X-Ray">
+              <div class="risk-card-body">
                 <div class="risk-card-title">${escHtml(d.title)}</div>
                 <div class="risk-card-msg">${escHtml(d.message)}</div>
-                <div class="risk-card-msg" style="color:var(--accent-domain);margin-top:4px">Fix: ${escHtml(d.suggestion)}</div>
+                ${d.suggestion ? `<div class="risk-card-fix">Fix: ${escHtml(d.suggestion)}</div>` : ''}
               </div>
-              <span class="risk-loc">L${d.line || fn.startLine}</span>
+              <span class="risk-loc">L${d.line || fn.startLine} ↗</span>
             </div>
           `).join('')}
         </div>
@@ -1230,6 +1550,25 @@
       </div>
     `;
 
+    const toggleStepsBtn = document.getElementById('btn-toggle-steps');
+    if (toggleStepsBtn) {
+      toggleStepsBtn.addEventListener('click', () => {
+        const nextExpanded = toggleStepsBtn.getAttribute('data-expanded') !== '1';
+        toggleStepsBtn.setAttribute('data-expanded', nextExpanded ? '1' : '0');
+        document.getElementById('fn-pipeline-box').innerHTML = buildFunctionPipelineSvg(fn, nextExpanded);
+        toggleStepsBtn.textContent = nextExpanded
+          ? 'Show first 12 steps'
+          : `Show all ${fn.steps.length} steps (+${fn.steps.length - 12} more)`;
+      });
+    }
+
+    el.inspVisual.querySelectorAll('[data-jump-line]').forEach((card) => {
+      card.addEventListener('click', () => {
+        const ln = Number(card.getAttribute('data-jump-line'));
+        jumpToSourceLine(mod.source, fn.startLine, fn.endLine, diags.map((d) => d.line), ln, mod.lines);
+      });
+    });
+
     el.inspVisual.querySelectorAll('[data-jump-fn]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const fid = btn.getAttribute('data-jump-fn');
@@ -1240,13 +1579,13 @@
     });
 
     // 2. Source X-Ray Tab
-    el.inspSource.innerHTML = renderCodeViewer(mod.source, fn.startLine, fn.endLine, diags.map((d) => d.line));
+    mountSourceViewer(mod.source, fn.startLine, fn.endLine, diags.map((d) => d.line), mod.lines);
   }
 
   /**
    * Generates a crisp inline SVG schematic of how data enters, transforms, branches, and exits a function!
    */
-  function buildFunctionPipelineSvg(fn) {
+  function buildFunctionPipelineSvg(fn, showAll = false) {
     const W = 368;
     const STEP_H = 44;
     const GAP = 14;
@@ -1265,7 +1604,7 @@
     };
 
     const steps = fn.steps.length
-      ? fn.steps.slice(0, 12)
+      ? (showAll ? fn.steps : fn.steps.slice(0, 12))
       : [{ kind: 'output', label: `Return ${fn.returnType || fn.returnExprs[0] || 'void'}`, inputs: [], output: 'return', line: fn.startLine }];
 
     const headerH = 44;
@@ -1347,6 +1686,23 @@
         </div>
       </div>` : ''}
 
+      ${diags.length ? `
+      <div class="insp-section">
+        <div class="insp-section-title">Bug Radar Findings (${diags.length})</div>
+        <div class="chip-list">
+          ${diags.map((d) => `
+            <div class="risk-card sev-${d.severity}" data-jump-line="${d.line || 1}" title="Click to inspect line in Source X-Ray">
+              <div class="risk-card-body">
+                <div class="risk-card-title">${escHtml(d.title)}</div>
+                <div class="risk-card-msg">${escHtml(d.message)}</div>
+                ${d.suggestion ? `<div class="risk-card-fix">Fix: ${escHtml(d.suggestion)}</div>` : ''}
+              </div>
+              <span class="risk-loc">L${d.line || 1} ↗</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : ''}
+
       <div class="insp-section">
         <div class="insp-section-title">Functions Inside This Module (${fns.length})</div>
         <div class="chip-list">
@@ -1386,24 +1742,14 @@
           `).join('')}
         </div>
       </div>
-
-      ${diags.length ? `
-      <div class="insp-section">
-        <div class="insp-section-title">Bug Radar Findings (${diags.length})</div>
-        <div class="chip-list">
-          ${diags.map((d) => `
-            <div class="risk-card sev-${d.severity}" style="cursor:default">
-              <div>
-                <div class="risk-card-title">${escHtml(d.title)}</div>
-                <div class="risk-card-msg">${escHtml(d.message)}</div>
-              </div>
-              <span class="risk-loc">L${d.line || 1}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>` : ''}
     `;
 
+    el.inspVisual.querySelectorAll('[data-jump-line]').forEach((card) => {
+      card.addEventListener('click', () => {
+        const ln = Number(card.getAttribute('data-jump-line'));
+        jumpToSourceLine(mod.source, 1, mod.lines, diags.map((d) => d.line), ln, mod.lines);
+      });
+    });
     el.inspVisual.querySelectorAll('[data-jump-fn]').forEach((b) => b.addEventListener('click', () => {
       const fid = b.getAttribute('data-jump-fn');
       selectEntity('function', fid);
@@ -1417,7 +1763,7 @@
       selectEntity('library', b.getAttribute('data-jump-lib'));
     }));
 
-    el.inspSource.innerHTML = renderCodeViewer(mod.source, 1, Math.min(mod.lines, 240), diags.map((d) => d.line));
+    mountSourceViewer(mod.source, 1, Math.min(mod.lines, 240), diags.map((d) => d.line), mod.lines);
   }
 
   function renderLibraryInspector(lib) {
@@ -1517,9 +1863,11 @@
       focusNodeInView(fid);
     }));
 
-    el.inspSource.innerHTML = fromMod
-      ? renderCodeViewer(fromMod.source, Math.max(1, edge.line - 8), Math.min(fromMod.lines, edge.line + 10), [edge.line])
-      : '';
+    if (fromMod) {
+      mountSourceViewer(fromMod.source, Math.max(1, edge.line - 8), Math.min(fromMod.lines, edge.line + 10), [edge.line], fromMod.lines);
+    } else {
+      el.inspSource.innerHTML = '';
+    }
   }
 
   function renderModEdgeInspector(edge) {
@@ -1557,7 +1905,8 @@
       setSemanticZoom(3, false);
       selectEntity('callEdge', b.getAttribute('data-jump-ce'));
     }));
-    el.inspSource.innerHTML = mf ? renderCodeViewer(mf.source, 1, Math.min(mf.lines, 40), []) : '';
+    if (mf) mountSourceViewer(mf.source, 1, Math.min(mf.lines, 40), [], mf.lines);
+    else el.inspSource.innerHTML = '';
   }
 
   // Zero-dependency lightweight syntax highlighter for Source X-Ray
@@ -1570,7 +1919,7 @@
       .replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="tok-num">$1</span>');
   }
 
-  function renderCodeViewer(source, startLine, endLine, riskLines = []) {
+  function renderCodeViewer(source, startLine, endLine, riskLines = [], jumpLine = null) {
     const riskSet = new Set(riskLines.filter(Boolean));
     const lines = source.split('\n');
     const from = Math.max(1, startLine - 2);
@@ -1579,11 +1928,42 @@
     for (let ln = from; ln <= to; ln++) {
       const inRange = ln >= startLine && ln <= endLine;
       const isRisk = riskSet.has(ln);
-      const cls = isRisk ? 'code-line hl-risk' : inRange ? 'code-line hl-focus' : 'code-line';
-      html += `<div class="${cls}"><span class="code-ln">${ln}</span><span class="code-txt">${highlightLine(lines[ln - 1] || '')}</span></div>`;
+      const isJump = jumpLine === ln;
+      const cls = isJump ? 'code-line hl-jump' : isRisk ? 'code-line hl-risk' : inRange ? 'code-line hl-focus' : 'code-line';
+      html += `<div class="${cls}" data-ln="${ln}"><span class="code-ln">${ln}</span><span class="code-txt">${highlightLine(lines[ln - 1] || '')}</span></div>`;
     }
     html += '</div>';
     return html;
+  }
+
+  function mountSourceViewer(source, startLine, endLine, riskLines = [], totalLines = null, jumpLine = null) {
+    const lineCount = totalLines || source.split('\n').length;
+    const isTruncated = startLine > 1 || endLine < lineCount;
+    const truncBar = isTruncated
+      ? `<div class="code-trunc-bar">
+          <span>Showing lines ${startLine}–${Math.min(endLine, lineCount)} of ${lineCount}</span>
+          <button class="panel-action-btn" id="btn-show-full-source">Show Full File (${lineCount} lines)</button>
+        </div>`
+      : '';
+    el.inspSource.innerHTML = truncBar + renderCodeViewer(source, startLine, endLine, riskLines, jumpLine);
+    const fullBtn = document.getElementById('btn-show-full-source');
+    if (fullBtn) {
+      fullBtn.addEventListener('click', () => {
+        mountSourceViewer(source, 1, lineCount, riskLines, lineCount, jumpLine);
+      });
+    }
+  }
+
+  function jumpToSourceLine(source, startLine, endLine, riskLines, targetLine, totalLines) {
+    const lineCount = totalLines || source.split('\n').length;
+    const showStart = targetLine < startLine ? 1 : startLine;
+    const showEnd = targetLine > endLine ? lineCount : endLine;
+    mountSourceViewer(source, showStart, showEnd, riskLines, lineCount, targetLine);
+    setActiveInspectorTab('source');
+    requestAnimationFrame(() => {
+      const row = el.inspSource.querySelector(`[data-ln="${targetLine}"]`);
+      if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   }
 
   // =========================================================================
@@ -1684,6 +2064,8 @@
         updateTraceView();
       });
     });
+    const activeBead = el.traceBeads.querySelector('.bead.active');
+    if (activeBead) activeBead.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 
     el.tracePacket.innerHTML = `
       <span class="muted">IN</span>
@@ -1694,6 +2076,8 @@
       <span class="pkt-out">${escHtml(hop.outputHint)}</span>
       <span class="muted" style="margin-left:auto">${escHtml(fn?.moduleId || '')}</span>
     `;
+
+    el.traceNarration.textContent = hop.narration || fn?.explanation?.plainEnglish || '';
 
     state.selection = { type: 'function', id: hop.toFunctionId };
     el.inspector.classList.remove('collapsed');
@@ -1758,16 +2142,45 @@
     renderCanvas();
   }
 
+  function toggleRiskExpanded(force) {
+    state.riskExpanded = force !== undefined ? force : !state.riskExpanded;
+    el.riskDock.classList.toggle('expanded', state.riskExpanded);
+    el.btnExpandRisk.classList.toggle('active', state.riskExpanded);
+    el.btnExpandRisk.setAttribute('aria-expanded', String(state.riskExpanded));
+    el.btnExpandRisk.textContent = state.riskExpanded ? '⤡ Compact' : '⤢ Expand';
+    updateRiskFooter();
+  }
+
+  function updateRiskFooter() {
+    const count = getFilteredDiagnostics().length;
+    if (count <= 2) {
+      el.riskDockFooter.classList.add('hidden');
+      return;
+    }
+    el.riskDockFooter.classList.remove('hidden');
+    const actionLabel = state.riskExpanded ? 'Compact view' : 'Expand to see more';
+    el.riskDockFooter.innerHTML = `
+      <span>Showing ${count} finding${count === 1 ? '' : 's'} — scroll to browse all</span>
+      <button class="panel-action-btn" id="btn-footer-expand-risk">${actionLabel}</button>
+    `;
+    document.getElementById('btn-footer-expand-risk').onclick = () => toggleRiskExpanded();
+  }
+
   function renderRiskDock() {
     const s = DATA.meta.stats;
     el.riskDockSummary.textContent = `${s.criticalCount} critical · ${s.warningCount} warning · ${s.infoCount} info`;
+
+    const catCount = (cat) => DATA.diagnostics.filter((d) => d.category === cat).length;
     const filters = [
       { id: 'all', label: `All (${DATA.diagnostics.length})` },
-      { id: 'critical', label: `Critical (${s.criticalCount})` },
-      { id: 'ai-antipattern', label: 'AI Smells' },
-      { id: 'security', label: 'Security' },
-      { id: 'architecture', label: 'Architecture' },
-      { id: 'dead-code', label: 'Orphan Code' }
+      ...(s.criticalCount > 0 ? [{ id: 'critical', label: `Critical (${s.criticalCount})` }] : []),
+      ...(s.warningCount > 0 ? [{ id: 'warning', label: `Warning (${s.warningCount})` }] : []),
+      ...(s.infoCount > 0 ? [{ id: 'info', label: `Info (${s.infoCount})` }] : []),
+      { id: 'ai-antipattern', label: `AI Smells (${catCount('ai-antipattern')})` },
+      { id: 'security', label: `Security (${catCount('security')})` },
+      { id: 'architecture', label: `Architecture (${catCount('architecture')})` },
+      ...(catCount('reliability') > 0 ? [{ id: 'reliability', label: `Reliability (${catCount('reliability')})` }] : []),
+      { id: 'dead-code', label: `Orphan Code (${catCount('dead-code')})` }
     ];
     el.riskFilters.textContent = '';
     for (const f of filters) {
@@ -1785,13 +2198,15 @@
     const list = getFilteredDiagnostics();
     el.riskList.innerHTML = list.length ? list.map((d) => `
       <div class="risk-card sev-${d.severity}" data-diag="${escHtml(d.id)}">
-        <div>
+        <div class="risk-card-body">
           <div class="risk-card-title">${escHtml(d.title)}</div>
           <div class="risk-card-msg">${escHtml(d.message)}</div>
+          ${d.suggestion ? `<div class="risk-card-fix">Fix: ${escHtml(d.suggestion)}</div>` : ''}
         </div>
         <span class="risk-loc">${escHtml(d.moduleId.split('/').pop())}${d.line ? `:${d.line}` : ''}</span>
       </div>
     `).join('') : '<div class="muted" style="padding:10px">No findings in this filter — clean circuit!</div>';
+    el.riskList.scrollTop = 0;
 
     el.riskList.querySelectorAll('[data-diag]').forEach((card) => {
       card.addEventListener('click', () => {
@@ -1808,6 +2223,8 @@
         }
       });
     });
+
+    updateRiskFooter();
   }
 
   // =========================================================================
@@ -1886,6 +2303,8 @@
   function openSearch() {
     el.searchModal.classList.remove('hidden');
     el.searchInput.value = '';
+    state.searchShowAll = false;
+    state.searchSelectedIndex = 0;
     renderSearchResults('');
     setTimeout(() => el.searchInput.focus(), 10);
   }
@@ -1894,27 +2313,54 @@
     el.searchModal.classList.add('hidden');
   }
 
+  function updateSearchSelection(nextIdx) {
+    const hits = el.searchResults._hits || [];
+    if (!hits.length) return;
+    state.searchSelectedIndex = ((nextIdx % hits.length) + hits.length) % hits.length;
+    el.searchResults.querySelectorAll('.search-item').forEach((btn, idx) => {
+      const sel = idx === state.searchSelectedIndex;
+      btn.classList.toggle('selected', sel);
+      if (sel) btn.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
   function renderSearchResults(query) {
     const q = query.trim().toLowerCase();
-    const hits = (q
+    const allHits = q
       ? searchIndex.filter((item) => item.title.toLowerCase().includes(q) || item.sub.toLowerCase().includes(q) || item.kind.toLowerCase().includes(q))
-      : searchIndex
-    ).slice(0, 18);
+      : searchIndex;
+    const limit = state.searchShowAll ? allHits.length : 25;
+    const hits = allHits.slice(0, limit);
+    state.searchSelectedIndex = 0;
 
-    el.searchResults.innerHTML = hits.length ? hits.map((h, i) => `
+    const metaBar = allHits.length > 0
+      ? `<div class="search-meta-bar"><span>Showing ${hits.length} of ${allHits.length} result${allHits.length === 1 ? '' : 's'}</span><span>↑↓ navigate · Enter open</span></div>`
+      : '';
+    const moreBtn = allHits.length > hits.length
+      ? `<button class="expand-more-btn" id="btn-search-show-all" style="margin-top:6px">Show all ${allHits.length} matches (+${allHits.length - hits.length} more)</button>`
+      : '';
+
+    el.searchResults.innerHTML = hits.length ? metaBar + hits.map((h, i) => `
       <button class="search-item${i === 0 ? ' selected' : ''}" data-sidx="${i}">
-        <div>
-          <div style="font-weight:650;font-family:var(--font-mono);color:var(--text-strong)">${escHtml(h.title)}</div>
-          <div class="muted">${escHtml(h.sub)}</div>
+        <div style="min-width:0;flex:1">
+          <div style="font-weight:650;font-family:var(--font-mono);color:var(--text-strong);word-break:break-word">${escHtml(h.title)}</div>
+          <div class="muted" style="word-break:break-word">${escHtml(h.sub)}</div>
         </div>
         <span class="search-kind">${escHtml(h.kind)}</span>
       </button>
-    `).join('') : '<div class="muted" style="padding:14px">No matching symbols found.</div>';
+    `).join('') + moreBtn : '<div class="muted" style="padding:14px">No matching symbols found.</div>';
 
     el.searchResults._hits = hits;
     el.searchResults.querySelectorAll('.search-item').forEach((btn) => {
       btn.addEventListener('click', () => activateSearchHit(hits[Number(btn.getAttribute('data-sidx'))]));
     });
+    const showAllBtn = document.getElementById('btn-search-show-all');
+    if (showAllBtn) {
+      showAllBtn.addEventListener('click', () => {
+        state.searchShowAll = true;
+        renderSearchResults(el.searchInput.value);
+      });
+    }
   }
 
   function activateSearchHit(hit) {
@@ -1987,8 +2433,12 @@
   function showTooltip(ev, title, sub) {
     el.tooltip.innerHTML = `<div class="tt-title">${escHtml(title)}</div><div class="tt-sub">${escHtml(sub)}</div>`;
     el.tooltip.classList.remove('hidden');
-    el.tooltip.style.left = `${Math.min(window.innerWidth - 310, ev.clientX + 14)}px`;
-    el.tooltip.style.top = `${Math.min(window.innerHeight - 80, ev.clientY + 14)}px`;
+    const tw = el.tooltip.offsetWidth || 280;
+    const th = el.tooltip.offsetHeight || 72;
+    const left = Math.max(8, Math.min(window.innerWidth - tw - 12, ev.clientX + 14));
+    const top = Math.max(8, Math.min(window.innerHeight - th - 12, ev.clientY + 14));
+    el.tooltip.style.left = `${left}px`;
+    el.tooltip.style.top = `${top}px`;
   }
 
   function hideTooltip() {
@@ -2029,6 +2479,8 @@
     }
   }
 
+  const OVERLAY_SELECTOR = '.trace-dock, .risk-dock, .story-panel, .tour-card, .viewport-hud, .floating-top-left';
+
   function bindStagePanZoom() {
     let dragging = false;
     let dragMoved = false;
@@ -2036,7 +2488,7 @@
     let dragStart = { x: 0, y: 0 };
 
     el.stage.addEventListener('mousedown', (ev) => {
-      if (ev.button !== 0 || ev.target.closest('.trace-dock, .risk-dock, .tour-card, .viewport-hud, .floating-top-left')) return;
+      if (ev.button !== 0 || ev.target.closest(OVERLAY_SELECTOR)) return;
       dragging = true;
       dragMoved = false;
       dragOrigin = { x: ev.clientX, y: ev.clientY };
@@ -2062,6 +2514,7 @@
     });
 
     el.stage.addEventListener('wheel', (ev) => {
+      if (ev.target.closest(OVERLAY_SELECTOR)) return;
       ev.preventDefault();
       const rect = el.stage.getBoundingClientRect();
       const mx = ev.clientX - rect.left;
@@ -2103,8 +2556,24 @@
       if (!ev.target.closest('.flow-menu-wrap')) el.flowPopover.classList.add('hidden');
     });
 
+    el.btnStory.onclick = () => toggleSystemStory();
+    el.btnExpandStory.onclick = () => {
+      state.storyExpanded = !state.storyExpanded;
+      el.storyPanel.classList.toggle('expanded', state.storyExpanded);
+      el.btnExpandStory.classList.toggle('active', state.storyExpanded);
+      el.btnExpandStory.setAttribute('aria-expanded', String(state.storyExpanded));
+      el.btnExpandStory.textContent = state.storyExpanded ? '⤡ Compact' : '⤢ Expand';
+    };
+    document.getElementById('story-close').onclick = () => toggleSystemStory(false);
+    el.btnPlainMode.onclick = () => {
+      state.plainEnglishMode = !state.plainEnglishMode;
+      el.btnPlainMode.classList.toggle('active-explain', state.plainEnglishMode);
+      renderCanvas();
+    };
+
     el.btnFlows.onclick = (e) => { e.stopPropagation(); el.flowPopover.classList.toggle('hidden'); };
     el.btnRisk.onclick = () => toggleRiskLens();
+    el.btnExpandRisk.onclick = () => toggleRiskExpanded();
     el.healthPill.onclick = () => toggleRiskLens(true);
     document.getElementById('btn-close-risk').onclick = () => toggleRiskLens(false);
     el.btnTour.onclick = () => startTour();
@@ -2116,14 +2585,17 @@
       el.themeGlyph.textContent = state.theme === 'dark' ? '☀' : '☾';
     };
 
+    el.btnExpandInspector.onclick = () => {
+      state.inspectorExpanded = !state.inspectorExpanded;
+      el.inspector.classList.toggle('expanded', state.inspectorExpanded);
+      el.btnExpandInspector.setAttribute('aria-expanded', String(state.inspectorExpanded));
+      el.btnExpandInspector.textContent = state.inspectorExpanded ? '⤡' : '⤢';
+      el.btnExpandInspector.title = state.inspectorExpanded ? 'Narrow Inspector' : 'Expand Inspector';
+      setTimeout(() => renderMiniMap(), 240);
+    };
     document.getElementById('insp-close').onclick = closeInspector;
     document.querySelectorAll('.insp-tab').forEach((tab) => {
-      tab.addEventListener('click', () => {
-        state.activeTab = tab.getAttribute('data-tab');
-        document.querySelectorAll('.insp-tab').forEach((t) => t.classList.toggle('active', t === tab));
-        el.inspVisual.classList.toggle('hidden', state.activeTab !== 'visual');
-        el.inspSource.classList.toggle('hidden', state.activeTab !== 'source');
-      });
+      tab.addEventListener('click', () => setActiveInspectorTab(tab.getAttribute('data-tab')));
     });
 
     document.getElementById('trace-prev').onclick = () => stepTrace(-1);
@@ -2136,9 +2608,15 @@
     el.tourNext.onclick = () => { if (state.tourIndex < DATA.tour.length - 1) { state.tourIndex++; applyTourStop(); } else closeTour(); };
 
     el.searchModal.addEventListener('click', (e) => { if (e.target === el.searchModal) closeSearch(); });
-    el.searchInput.addEventListener('input', (e) => renderSearchResults(e.target.value));
+    el.searchInput.addEventListener('input', (e) => {
+      state.searchShowAll = false;
+      renderSearchResults(e.target.value);
+    });
     el.searchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && el.searchResults._hits?.[0]) activateSearchHit(el.searchResults._hits[0]);
+      const hits = el.searchResults._hits || [];
+      if (e.key === 'ArrowDown') { e.preventDefault(); updateSearchSelection(state.searchSelectedIndex + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); updateSearchSelection(state.searchSelectedIndex - 1); }
+      else if (e.key === 'Enter' && hits[state.searchSelectedIndex]) activateSearchHit(hits[state.searchSelectedIndex]);
       else if (e.key === 'Escape') closeSearch();
     });
   }
@@ -2157,6 +2635,8 @@
       const key = e.key.toLowerCase();
       if (((e.metaKey || e.ctrlKey) && key === 'k') || e.key === '/') { e.preventDefault(); openSearch(); return; }
       if (e.key === '1' || e.key === '2' || e.key === '3') { setSemanticZoom(Number(e.key), true); return; }
+      if (key === 's') { toggleSystemStory(); return; }
+      if (key === 'e') { el.btnPlainMode.click(); return; }
       if (key === 'r') { toggleRiskLens(); return; }
       if (key === 't') { startTour(); return; }
       if (key === 'f') { fitToViewport(true); return; }
@@ -2166,7 +2646,8 @@
       if (e.key === 'Escape') {
         closeSearch();
         el.flowPopover.classList.add('hidden');
-        if (state.activeTrace) exitTrace();
+        if (state.storyOpen) toggleSystemStory(false);
+        else if (state.activeTrace) exitTrace();
         else if (state.tourIndex >= 0) closeTour();
         else if (state.riskLens) toggleRiskLens(false);
         else closeInspector();

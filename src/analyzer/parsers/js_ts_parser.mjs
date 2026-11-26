@@ -756,7 +756,38 @@ function parseExportBlock(tokens, i, imports, exports) {
   return closeB + 1;
 }
 
+function extractLeadingDoc(sourceLines, startLine) {
+  const collected = [];
+  let ln = startLine - 2; // 0-based line immediately above declaration
+  while (ln >= 0 && collected.length < 6) {
+    const t = (sourceLines[ln] || '').trim();
+    if (!t) {
+      if (collected.length) break;
+      ln--;
+      continue;
+    }
+    if (t.startsWith('//')) {
+      collected.unshift(t.replace(/^\/\/\s?/, ''));
+      ln--;
+    } else if (t.endsWith('*/')) {
+      while (ln >= 0 && collected.length < 8) {
+        const cur = (sourceLines[ln] || '').trim();
+        const cleaned = cur.replace(/^\/\*\*?/, '').replace(/\*\/$/, '').replace(/^\*\s?/, '').trim();
+        if (cleaned && !cleaned.startsWith('@')) collected.unshift(cleaned);
+        ln--;
+        if (cur.startsWith('/*')) break;
+      }
+      break;
+    } else {
+      break;
+    }
+  }
+  const text = collected.join(' ').replace(/\s+/g, ' ').trim();
+  return text.length >= 10 ? text.slice(0, 180) : null;
+}
+
 export function parseJsTsFile(filePath, source, language) {
+  const sourceLines = source.split('\n');
   const tokens = tokenizeJS(source);
   const imports = [];
   const exports = new Set();
@@ -775,7 +806,8 @@ export function parseJsTsFile(filePath, source, language) {
       startLine: fnInfo.startLine, endLine, lines: Math.max(1, endLine - fnInfo.startLine + 1),
       params: fnInfo.params, returnType: fnInfo.returnType, returnExprs: analysis.returnExprs,
       complexity: analysis.complexity, flags: analysis.flags, steps: analysis.steps, calls: analysis.calls,
-      bodyFingerprint: analysis.bodyFingerprint
+      bodyFingerprint: analysis.bodyFingerprint,
+      docComment: extractLeadingDoc(sourceLines, fnInfo.startLine)
     });
   };
 
@@ -809,5 +841,6 @@ export function parseJsTsFile(filePath, source, language) {
   }
 
   if (!entryReason && (source.startsWith('#!') || /\bprocess\.argv\b/.test(source))) entryReason = 'CLI Entrypoint';
-  return { language, lines: source.split('\n').length, imports, exports: [...exports], functions, entryReason, issues: moduleIssues, topLevelRefs: [...topLevelRefs] };
+  const fileDoc = extractLeadingDoc(sourceLines, 12);
+  return { language, lines: sourceLines.length, imports, exports: [...exports], functions, entryReason, issues: moduleIssues, topLevelRefs: [...topLevelRefs], docComment: fileDoc };
 }

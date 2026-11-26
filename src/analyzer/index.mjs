@@ -5,6 +5,7 @@ import { parsePythonBatch } from './parsers/python_bridge.mjs';
 import { parseGenericFile } from './parsers/generic_parser.mjs';
 import { buildCodeGraph } from './graph_builder.mjs';
 import { runDiagnostics } from './diagnostics.mjs';
+import { enrichWithExplanations } from './explainer.mjs';
 
 const IGNORE_DIRS = new Set([
   'node_modules', '.git', '.hg', '.svn', 'dist', 'build', 'out', '.next', '.nuxt',
@@ -192,9 +193,9 @@ export function analyzeCodebase(targetPath, options = {}) {
 
   const totalLines = graph.modules.reduce((s, m) => s + m.lines, 0);
 
-  return {
+  const ir = {
     meta: {
-      version: '1.0.0',
+      version: '2.0.0',
       projectName,
       rootPath: absRoot,
       generatedAt: new Date().toISOString(),
@@ -223,4 +224,6 @@ export function analyzeCodebase(targetPath, options = {}) {
     diagnostics,
     tour
   };
+
+  return enrichWithExplanations(ir);
 }

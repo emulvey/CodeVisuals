@@ -268,6 +268,8 @@ def analyze_function(fn_node, class_name=None):
 
     start_line = fn_node.lineno
     end_line = getattr(fn_node, "end_lineno", start_line)
+    doc = ast.get_docstring(fn_node)
+    doc_clean = re.sub(r"\s+", " ", doc).strip()[:180] if doc else None
     return {
         "name": f"{route_label} ({name})" if route_label else name,
         "qualName": f"{route_label} ({qual_name})" if route_label else qual_name,
@@ -281,6 +283,7 @@ def analyze_function(fn_node, class_name=None):
         "returnExprs": ctx["return_exprs"][:4], "complexity": ctx["complexity"],
         "flags": ctx["flags"], "steps": ctx["steps"], "calls": ctx["calls"],
         "bodyFingerprint": body_fingerprint(fn_node),
+        "docComment": doc_clean,
     }, ctx["issues"]
 
 
@@ -328,7 +331,9 @@ def parse_python_file(path):
                 if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Name):
                     top_refs.append(sub.func.id)
 
-    return {"language": "python", "lines": lines, "imports": imports, "exports": exports, "functions": functions, "entryReason": entry_reason, "issues": issues, "topLevelRefs": top_refs}
+    mod_doc = ast.get_docstring(tree)
+    mod_doc_clean = re.sub(r"\s+", " ", mod_doc).strip()[:180] if mod_doc else None
+    return {"language": "python", "lines": lines, "imports": imports, "exports": exports, "functions": functions, "entryReason": entry_reason, "issues": issues, "topLevelRefs": top_refs, "docComment": mod_doc_clean}
 
 
 def main():
