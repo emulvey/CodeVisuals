@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Glassbox — __PROJECT_NAME__</title>
+  <style>
+__GLASSBOX_CSS__
+  </style>
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <!-- TOP STUDIO HUD -->
+    <header class="hud-bar">
+      <div class="hud-left">
+        <div class="brand" title="Glassbox Visual Codebase Guide">
+          <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3" y="3" width="18" height="18" rx="4" stroke-opacity="0.9"/>
+            <path d="M7 12h3l2-4 2 8 2-4h1" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="7" cy="12" r="1.3" fill="currentColor"/>
+            <circle cx="17" cy="12" r="1.3" fill="currentColor"/>
+          </svg>
+          <span class="brand-name">GLASSBOX</span>
+        </div>
+        <div class="divider-v"></div>
+        <div class="project-badge">
+          <span id="project-title" class="project-title"></span>
+          <span id="project-meta" class="project-meta"></span>
+        </div>
+      </div>
+
+      <!-- SEMANTIC ZOOM SWITCHER -->
+      <nav class="zoom-switcher" aria-label="Semantic Zoom Level">
+        <button class="zoom-pill" data-level="1" title="System Atlas — Architectural Layers (Key: 1)">
+          <span class="pill-key">1</span>
+          <span class="pill-label">Atlas</span>
+        </button>
+        <button class="zoom-pill active" data-level="2" title="Module Circuit — Files, Ports & Libraries (Key: 2)">
+          <span class="pill-key">2</span>
+          <span class="pill-label">Circuit</span>
+        </button>
+        <button class="zoom-pill" data-level="3" title="Function Dataflow — Chips & Payload Wires (Key: 3)">
+          <span class="pill-key">3</span>
+          <span class="pill-label">Dataflow</span>
+        </button>
+      </nav>
+
+      <!-- RIGHT CONTROLS -->
+      <div class="hud-right">
+        <div class="flow-menu-wrap">
+          <button id="btn-flows" class="hud-btn hud-btn-signal" title="Follow an End-to-End Execution Signal">
+            <span class="btn-dot signal-dot"></span>
+            <span>Trace Signal</span>
+            <span id="flow-count" class="count-chip">0</span>
+          </button>
+          <div id="flow-popover" class="popover hidden"></div>
+        </div>
+
+        <button id="btn-risk" class="hud-btn hud-btn-risk" title="Toggle Bug Radar & AI-Code Audit Lens (Key: R)">
+          <span class="btn-dot risk-dot"></span>
+          <span>Bug Radar</span>
+          <span id="risk-count" class="count-chip">0</span>
+        </button>
+
+        <button id="btn-tour" class="hud-btn" title="60-Second Guided Codebase Walkthrough (Key: T)">
+          <span>Guided Tour</span>
+        </button>
+
+        <button id="btn-search" class="hud-btn hud-btn-icon" title="Search Codebase (Key: / or Ctrl+K)">
+          <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="9" cy="9" r="5.5"/>
+            <path d="M13.5 13.5L17 17" stroke-linecap="round"/>
+          </svg>
+          <kbd>/</kbd>
+        </button>
+
+        <div id="health-pill" class="health-pill" title="Codebase Structural & AI-Audit Health Score">
+          <svg class="health-ring" viewBox="0 0 28 28">
+            <circle class="ring-bg" cx="14" cy="14" r="10.5"/>
+            <circle id="health-ring-fg" class="ring-fg" cx="14" cy="14" r="10.5" stroke-dasharray="66" stroke-dashoffset="0"/>
+          </svg>
+          <span id="health-score-val">--</span>
+        </div>
+
+        <button id="btn-theme" class="hud-btn hud-btn-icon" title="Switch Dark / Light Blueprint Theme">
+          <span id="theme-glyph">☀</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN WORKSPACE -->
+    <main class="workspace">
+      <!-- CANVAS STAGE -->
+      <div id="canvas-stage" class="canvas-stage">
+        <svg id="circuit-svg" class="circuit-svg" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="glow-cyan" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="3.5" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <filter id="glow-risk" x="-35%" y="-35%" width="170%" height="170%">
+              <feGaussianBlur stdDeviation="4.5" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <filter id="card-shadow" x="-12%" y="-12%" width="124%" height="132%">
+              <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.28"/>
+            </filter>
+            <marker id="arrow-default" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 1 2 L 8.5 5 L 1 8 z" fill="var(--wire-stroke)"/>
+            </marker>
+            <marker id="arrow-active" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M 1 1.5 L 9 5 L 1 8.5 z" fill="var(--accent-signal)"/>
+            </marker>
+            <marker id="arrow-cycle" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+              <path d="M 1 1.5 L 9 5 L 1 8.5 z" fill="var(--accent-critical)"/>
+            </marker>
+            <marker id="arrow-lib" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 1 2 L 8.5 5 L 1 8 z" fill="var(--accent-lib)"/>
+            </marker>
+          </defs>
+          <g id="viewport-group">
+            <g id="layer-zones"></g>
+            <g id="layer-edges"></g>
+            <g id="layer-nodes"></g>
+            <g id="layer-overlays"></g>
+          </g>
+        </svg>
+
+        <!-- FLOATING LEGEND & BREADCRUMB (TOP-LEFT) -->
+        <div class="floating-top-left">
+          <div id="breadcrumb-bar" class="breadcrumb-bar"></div>
+          <div id="legend-panel" class="legend-panel">
+            <div class="legend-row">
+              <span class="legend-chip"><i class="swatch" style="background:#38bdf8"></i>Entry</span>
+              <span class="legend-chip"><i class="swatch" style="background:#818cf8"></i>Orchestration</span>
+              <span class="legend-chip"><i class="swatch" style="background:#34d399"></i>Domain</span>
+              <span class="legend-chip"><i class="swatch" style="background:#fbbf24"></i>Data / Infra</span>
+              <span class="legend-chip"><i class="swatch" style="background:#c084fc"></i>External Lib</span>
+            </div>
+            <div class="legend-row legend-glyphs">
+              <span><b>⚡</b> Async</span>
+              <span><b>⇄</b> I/O</span>
+              <span><b>✎</b> Mutates</span>
+              <span><b>⑂</b> Branch</span>
+              <span><b>↻</b> Cycle</span>
+              <span><b>⚠</b> Risk</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- FLOATING HOVER TOOLTIP -->
+        <div id="hover-tooltip" class="hover-tooltip hidden"></div>
+
+        <!-- FLOATING BUG RADAR DOCK -->
+        <div id="risk-dock" class="risk-dock hidden">
+          <div class="risk-dock-header">
+            <div class="risk-dock-title">
+              <span class="risk-dot-lg"></span>
+              <strong>Bug Radar &amp; AI-Code Audit</strong>
+              <span id="risk-dock-summary" class="muted"></span>
+            </div>
+            <div id="risk-filters" class="risk-filters"></div>
+            <button id="btn-close-risk" class="icon-close" title="Exit Risk Lens">✕</button>
+          </div>
+          <div id="risk-list" class="risk-list"></div>
+        </div>
+
+        <!-- FLOATING SIGNAL TRACER STEPPER DOCK -->
+        <div id="trace-dock" class="trace-dock hidden">
+          <div class="trace-header">
+            <div class="trace-title-group">
+              <span class="signal-pulse-dot"></span>
+              <strong id="trace-title">Signal Trace</strong>
+              <span id="trace-hop-counter" class="muted"></span>
+            </div>
+            <div class="trace-controls">
+              <button id="trace-prev" class="trace-btn" title="Previous Hop (←)">◀</button>
+              <button id="trace-play" class="trace-btn trace-btn-primary" title="Play / Pause (Space)">▶ Play</button>
+              <button id="trace-next" class="trace-btn" title="Next Hop (→)">▶</button>
+              <button id="trace-close" class="trace-btn" title="Exit Trace (Esc)">✕</button>
+            </div>
+          </div>
+          <div id="trace-beads" class="trace-beads"></div>
+          <div id="trace-packet" class="trace-packet"></div>
+        </div>
+
+        <!-- FLOATING GUIDED TOUR CARD -->
+        <div id="tour-card" class="tour-card hidden">
+          <div class="tour-header">
+            <span class="tour-badge">GUIDED WALKTHROUGH</span>
+            <button id="tour-close" class="icon-close" title="Close Tour">✕</button>
+          </div>
+          <h3 id="tour-title" class="tour-title"></h3>
+          <p id="tour-caption" class="tour-caption"></p>
+          <div class="tour-footer">
+            <div id="tour-dots" class="tour-dots"></div>
+            <div class="tour-actions">
+              <button id="tour-prev" class="trace-btn">← Back</button>
+              <button id="tour-next" class="trace-btn trace-btn-primary">Next →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- FLOATING BOTTOM-RIGHT VIEWPORT CONTROLS & MINI-MAP -->
+        <div class="viewport-hud">
+          <div class="minimap-card" title="Spatial Mini-Map — Click or drag to navigate">
+            <svg id="minimap-svg" class="minimap-svg" viewBox="0 0 180 110"></svg>
+          </div>
+          <div class="zoom-controls">
+            <button id="btn-zoom-out" class="vc-btn" title="Zoom Out">−</button>
+            <span id="zoom-pct" class="zoom-pct">100%</span>
+            <button id="btn-zoom-in" class="vc-btn" title="Zoom In">+</button>
+            <button id="btn-zoom-fit" class="vc-btn" title="Fit to Screen (Key: F)">Fit</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT FOCUS+CONTEXT INSPECTOR DRAWER -->
+      <aside id="inspector" class="inspector collapsed" aria-label="Component X-Ray Inspector">
+        <div class="inspector-header">
+          <div class="inspector-title-block">
+            <div id="insp-badges" class="insp-badges"></div>
+            <h2 id="insp-title" class="insp-title">Select any chip or wire</h2>
+            <div id="insp-subtitle" class="insp-subtitle"></div>
+          </div>
+          <button id="insp-close" class="icon-close" title="Close Inspector (Esc)">✕</button>
+        </div>
+
+        <div id="insp-actions" class="insp-actions"></div>
+
+        <div class="insp-tabs">
+          <button class="insp-tab active" data-tab="visual">Visual Flow</button>
+          <button class="insp-tab" data-tab="source">Source X-Ray</button>
+        </div>
+
+        <div id="insp-body-visual" class="insp-body"></div>
+        <div id="insp-body-source" class="insp-body hidden"></div>
+      </aside>
+    </main>
+
+    <!-- COMMAND PALETTE SEARCH MODAL -->
+    <div id="search-modal" class="modal-backdrop hidden">
+      <div class="search-dialog">
+        <div class="search-input-wrap">
+          <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="9" cy="9" r="5.5"/><path d="M13.5 13.5L17 17" stroke-linecap="round"/>
+          </svg>
+          <input id="search-input" type="text" placeholder="Jump to module, function, external library, flow, or bug…" autocomplete="off" />
+          <kbd>ESC</kbd>
+        </div>
+        <div id="search-results" class="search-results"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.__GLASSBOX_DATA__ = __GLASSBOX_DATA_JSON__;
+  </script>
+  <script>
+__GLASSBOX_JS__
+  </script>
+</body>
+</html>

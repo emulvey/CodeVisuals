@@ -1,0 +1,18 @@
+{
+  "name": "glassbox-code-visuals-v2",
+  "version": "2.0.0",
+  "description": "Glassbox: An HCI-grounded visual codebase guide & dataflow explorer for understanding large and AI-generated codebases.",
+  "type": "module",
+  "bin": {
+    "glassbox": "./bin/glassbox.mjs"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "demo": "node bin/glassbox.mjs ../examples/pulsepay-ai-demo -o dist/pulsepay-guide.html",
+    "self": "node bin/glassbox.mjs src -o dist/glassbox-self-guide.html"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}
